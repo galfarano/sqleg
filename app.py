@@ -4,10 +4,22 @@ import streamlit as st
 import json
 import tempfile
 import html
+import csv
+import io
 from collections import defaultdict
 from pyvis.network import Network
 
 from core import update_output_columns, generate_sql_from_graph, infer_custom_sql_columns_with_llm
+
+
+def extract_columns_from_csv(uploaded_file):
+    """Legge la prima riga del CSV e restituisce i nomi delle colonne."""
+    try:
+        content = uploaded_file.getvalue().decode("utf-8")
+        reader = csv.reader(io.StringIO(content))
+        return [c.strip() for c in next(reader, []) if c.strip()]
+    except Exception:
+        return []
 
 # =========================
 # Config iniziale
@@ -36,7 +48,12 @@ with st.sidebar.form("add_node_form"):
 
     if node_type == "input_table":
         extra["table"] = st.text_input("Table name")
-        extra["columns"] = st.text_input("Columns (comma-separated)")
+        uploaded = st.file_uploader("CSV sample (header only)", type="csv", key="add_csv")
+        manual_cols = st.text_input("Columns (comma-separated)", disabled=uploaded is not None)
+        if uploaded is not None:
+            extra["columns"] = extract_columns_from_csv(uploaded)
+        else:
+            extra["columns"] = manual_cols
     elif node_type == "filter":
         extra["condition"] = st.text_input("WHERE condition")
     elif node_type == "select":
@@ -176,8 +193,17 @@ if node_ids:
 
         if selected_node['type'] == "input_table":
             selected_node['table'] = st.text_input("Table name", selected_node.get("table", ""))
+            uploaded_edit = st.file_uploader(
+                "CSV sample (header only)", type="csv", key=f"edit_csv_{selected}"
+            )
             cols = ", ".join(selected_node.get("columns", []))
-            selected_node['columns'] = [c.strip() for c in st.text_input("Columns", cols).split(",") if c.strip()]
+            manual_edit = st.text_input(
+                "Columns", cols, disabled=uploaded_edit is not None
+            )
+            if uploaded_edit is not None:
+                selected_node['columns'] = extract_columns_from_csv(uploaded_edit)
+            else:
+                selected_node['columns'] = [c.strip() for c in manual_edit.split(",") if c.strip()]
 
         if selected_node['type'] == "custom_sql":
             selected_node['sql'] = st.text_area("SQL code", selected_node.get("sql", ""), height=150)
