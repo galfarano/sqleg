@@ -3,6 +3,14 @@
 import re
 import json
 from collections import defaultdict, deque
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+my_key = os.getenv("OPENAI_API_KEY")
+if not my_key:
+    raise ValueError("Chiave API mancante. Sei sicuro di avere un file .env con OPENAI_API_KEY?")
+
 
 # === Utils ===
 
